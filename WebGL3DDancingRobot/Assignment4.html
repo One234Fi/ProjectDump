@@ -1,0 +1,541 @@
+<!--
+Ethan McCarthy
+COSC 4345.001
+4/3/2022
+Creates a 3D robot that toggles power when "X" is pressed and dances when "D" is pressed
+-->
+
+<!DOCTYPE html>
+<html>
+<style type="text/css">
+  	canvas { background: red; }
+</style>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPos;
+
+void main() {
+  	gl_PointSize = 1.0;
+	gl_Position = vPos;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec4 u_color;
+
+void main() {
+	gl_FragColor = u_color;
+}
+</script>
+
+
+<script type="text/javascript" src="webgl-utils.js"></script>
+<script type="text/javascript" src="initshaders.js"></script>
+<script type="text/javascript" src="T7lines.js"></script>
+<script type="text/javascript" src="T7matrices.js"></script>
+<script type="text/javascript" src="T7projection.js"></script>
+
+<script>
+window.addEventListener("keydown", keycheck, false);
+
+function keycheck(e) {
+  	// Toggle power when the letter x is pressed
+  	if (e.keyCode == "88") {
+		isPowered = !isPowered;
+
+		//stop dancing when power is turned off
+		if (isDancing) {
+			isDancing = !isDancing;
+		}
+  	}
+	
+	// Toggle dancing when the letter d is pressed and the power is on
+	if (e.keyCode == "68" && isPowered) {
+		isDancing = !isDancing;
+	}
+}
+
+</script>
+
+<script type="text/javascript">
+var canvas;
+var gl;
+var colorUniformLocation;
+
+//offset, degree, and boolean variables that are used for updates later
+var armsOffsetY = 0;
+var armsOffsetZ = 0;
+var armsWaveOffset = 0;
+var armsWaveDegrees = 0;
+var armsDegreesX = 0;
+var isPowered = false;
+var isDancing = false;
+var wave = false;
+
+//face object to store the point configuration, solidity, and color, all together
+function Face (points, isSolid, color) {
+	this.points = points;
+	this.isSolid = isSolid;
+	this.color = color;
+};
+
+// 3D World coordinate points
+var originalPoints = [  
+				//TRANSLUCENT
+
+			//Torso
+			[-100.0, -120.0, 80.0, 1.0], //0
+                        [100.0, -120.0, 80.0, 1.0],
+                        [-150.0, 150.0, 100.0, 1.0],
+                        [150.0, 150.0, 100.0, 1.0],
+                        [-100.0, -120.0, -80.0, 1.0],
+                        [100.0, -120.0, -80.0, 1.0],
+                        [-150.0, 150.0, -100.0, 1.0],
+                        [150.0, 150.0, -100.0, 1.0],
+
+
+				//GLOWING COLOR 1
+
+			//BatteryLeft
+                        [-60.0, 0.0, 80.0, 1.0], //8 / 6
+                        [-20.0, 0.0, 80.0, 1.0],
+                        [-60.0, 80.0, 80.0, 1.0],
+                        [-20.0, 80.0, 80.0, 1.0],
+                        [-60.0, 0.0, 0.0, 1.0],
+                        [-20.0, 0.0, 0.0, 1.0],
+                        [-60.0, 80.0, 0.0, 1.0],
+                        [-20.0, 80.0, 0.0, 1.0],
+
+			//BatteryRight
+			[20.0, 0.0, 80.0, 1.0], //16 / 12
+                        [60.0, 0.0, 80.0, 1.0],
+                        [20.0, 80.0, 80.0, 1.0],
+                        [60.0, 80.0, 80.0, 1.0],
+                        [20.0, 0.0, 0.0, 1.0],
+                        [60.0, 0.0, 0.0, 1.0],
+                        [20.0, 80.0, 0.0, 1.0],
+                        [60.0, 80.0, 0.0, 1.0],
+
+			//Left Eye
+			[-50.0, 210.0, 70.0, 1.0], //24 / 18
+                        [-10.0, 210.0, 70.0, 1.0],
+                        [-50.0, 250.0, 70.0, 1.0],
+                        [-10.0, 250.0, 70.0, 1.0],
+                        [-50.0, 210.0, 65.0, 1.0],
+                        [-10.0, 210.0, 65.0, 1.0],
+                        [-50.0, 250.0, 65.0, 1.0],
+                        [-10.0, 250.0, 65.0, 1.0],
+
+			//Right Eye
+			[10.0, 210.0, 70.0, 1.0], //32 / 24
+                        [50.0, 210.0, 70.0, 1.0],
+                        [10.0, 250.0, 70.0, 1.0],
+                        [50.0, 250.0, 70.0, 1.0],
+                        [10.0, 210.0, 65.0, 1.0],
+                        [50.0, 210.0, 65.0, 1.0],
+                        [10.0, 250.0, 65.0, 1.0],
+                        [50.0, 250.0, 65.0, 1.0],
+
+
+				//GLOWING COLOR 2
+
+			//BatteryMid
+			[-20.0, 0.0, 80.0, 1.0], //40 / 30
+                        [20.0, 0.0, 80.0, 1.0],
+                        [-20.0, 80.0, 80.0, 1.0],
+                        [20.0, 80.0, 80.0, 1.0],
+                        [-20.0, 0.0, 0.0, 1.0],
+                        [20.0, 0.0, 0.0, 1.0],
+                        [-20.0, 80.0, 0.0, 1.0],
+                        [20.0, 80.0, 0.0, 1.0],
+
+			//Mouth
+			[-30.0, 170.0, 70.0, 1.0], //48 / 36
+                        [30.0, 170.0, 70.0, 1.0],
+                        [-30.0, 190.0, 70.0, 1.0],
+                        [30.0, 190.0, 70.0, 1.0],
+                        [-30.0, 170.0, 65.0, 1.0],
+                        [30.0, 170.0, 65.0, 1.0],
+                        [-30.0, 190.0, 65.0, 1.0],
+                        [30.0, 190.0, 65.0, 1.0],
+
+			
+				//DEFAULT/BODY COLOR
+
+			//BatteryPosSide
+			[60.0, 30.0, 50.0, 1.0], //56 / 42
+                        [80.0, 30.0, 50.0, 1.0],
+                        [60.0, 50.0, 50.0, 1.0],
+                        [80.0, 50.0, 50.0, 1.0],
+                        [60.0, 30.0, 30.0, 1.0],
+                        [80.0, 30.0, 30.0, 1.0],
+                        [60.0, 50.0, 30.0, 1.0],
+                        [80.0, 50.0, 30.0, 1.0],
+
+			//Head
+			[-65.0, 150.0, 65.0, 1.0], //64 / 48
+                        [65.0, 150.0, 65.0, 1.0],
+                        [-65.0, 280.0, 65.0, 1.0],
+                        [65.0, 280.0, 65.0, 1.0],
+                        [-65.0, 150.0, -65.0, 1.0],
+                        [65.0, 150.0, -65.0, 1.0],
+                        [-65.0, 280.0, -65.0, 1.0],
+                        [65.0, 280.0, -65.0, 1.0],
+
+			//Left Shoulder
+			[-210.0, 100.0, 65.0, 1.0], //72 / 54
+                        [-120.0, 100.0, 65.0, 1.0],
+                        [-210.0, 170.0, 65.0, 1.0],
+                        [-120.0, 170.0, 65.0, 1.0],
+                        [-210.0, 100.0, -65.0, 1.0],
+                        [-120.0, 100.0, -65.0, 1.0],
+                        [-210.0, 170.0, -65.0, 1.0],
+                        [-120.0, 170.0, -65.0, 1.0],
+
+			//Right Shoulder
+			[120.0, 100.0, 65.0, 1.0], //80 / 60
+                        [210.0, 100.0, 65.0, 1.0],
+                        [120.0, 170.0, 65.0, 1.0],
+                        [210.0, 170.0, 65.0, 1.0],
+                        [120.0, 100.0, -65.0, 1.0],
+                        [210.0, 100.0, -65.0, 1.0],
+                        [120.0, 170.0, -65.0, 1.0],
+                        [210.0, 170.0, -65.0, 1.0],
+
+			//Left Arm
+			[-200.0, -100.0, 60.0, 1.0], //88 / 66
+                        [-130.0, -100.0, 60.0, 1.0],
+                        [-200.0, 100.0, 60.0, 1.0],
+                        [-130.0, 100.0, 60.0, 1.0],
+                        [-200.0, -100.0, -60.0, 1.0],
+                        [-130.0, -100.0, -60.0, 1.0],
+                        [-200.0, 100.0, -60.0, 1.0],
+                        [-130.0, 100.0, -60.0, 1.0],
+
+			//Right Arm
+			[130.0, -100.0, 60.0, 1.0], //96 / 72
+                        [200.0, -100.0, 60.0, 1.0],
+                        [130.0, 100.0, 60.0, 1.0],
+                        [200.0, 100.0, 60.0, 1.0],
+                        [130.0, -100.0, -60.0, 1.0],
+                        [200.0, -100.0, -60.0, 1.0],
+                        [130.0, 100.0, -60.0, 1.0],
+                        [200.0, 100.0, -60.0, 1.0],
+
+			//Hips
+			[-150.0, -250.0, 80.0, 1.0], //104 / 78
+                        [150.0, -250.0, 80.0, 1.0],
+                        [-150.0, -120.0, 80.0, 1.0],
+                        [150.0, -120.0, 80.0, 1.0],
+                        [-150.0, -250.0, -100.0, 1.0],
+                        [150.0, -250.0, -100.0, 1.0],
+                        [-150.0, -120.0, -100.0, 1.0],
+                        [150.0, -120.0, -100.0, 1.0],
+
+			//Left Leg
+			[-150.0, -500.0, 80.0, 1.0], //112 / 84
+                        [-20.0, -500.0, 80.0, 1.0],
+                        [-150.0, -250.0, 80.0, 1.0],
+                        [-20.0, -250.0, 80.0, 1.0],
+                        [-150.0, -500.0, -100.0, 1.0],
+                        [-20.0, -500.0, -100.0, 1.0],
+                        [-150.0, -250.0, -100.0, 1.0],
+                        [-20.0, -250.0, -100.0, 1.0],
+
+			//Right Leg
+			[20.0, -500.0, 80.0, 1.0], //120 / 90
+                        [150.0, -500.0, 80.0, 1.0],
+                        [20.0, -250.0, 80.0, 1.0],
+                        [150.0, -250.0, 80.0, 1.0],
+                        [20.0, -500.0, -100.0, 1.0],
+                        [150.0, -500.0, -100.0, 1.0],
+                        [20.0, -250.0, -100.0, 1.0],
+                        [150.0, -250.0, -100.0, 1.0],
+];
+
+var faces = [ 
+		//Torso
+		new Face([0, 1, 3, 2], false, [1.0, 1.0, 1.0, 1.0]),
+		new Face([5, 4, 6, 7], false, [1.0, 1.0, 1.0, 1.0]),
+		new Face([4, 0, 2, 6], false, [1.0, 1.0, 1.0, 1.0]),
+		new Face([1, 5, 7, 3], false, [1.0, 1.0, 1.0, 1.0]),
+		new Face([2, 3, 7, 6], false, [1.0, 1.0, 1.0, 1.0]),
+		new Face([1, 0, 4, 5], false, [1.0, 1.0, 1.0, 1.0])
+];
+
+//constant colors, non-constant colors are handled entirely in the updates
+var defaultColor = [0.5, 0.5, 0.5, 1.0];
+var lineColor = [0.1, 0.1, 0.1, 1.0];
+
+//push all the originalPoints into faces and add solid[i] == true
+//start at 8 to skip the torso points so that it remains transparent
+for (var i = 8; i < originalPoints.length; i+=8) {
+	faces.push(new Face([i, i+1, i+3, i+2], true, defaultColor));		//A
+	faces.push(new Face([i+5, i+4, i+6, i+7], true, defaultColor));		//B
+	faces.push(new Face([i+4, i, i+2, i+6], true, defaultColor));		//C
+	faces.push(new Face([i+1, i+5, i+7, i+3], true, defaultColor));		//D
+	faces.push(new Face([i+2, i+3, i+7, i+6], true, defaultColor));		//E
+	faces.push(new Face([i+1, i, i+4, i+5], true, defaultColor));		//F
+}
+
+var camera = [0.0, 150, 500.0, 1.0];
+
+window.onload = init;
+
+function render() {
+
+		//OFFSET, ANGLE, AND COLOR UPDATES
+
+	if (isPowered) {
+		//change the battery color to "turn it on"
+		for (var i = 6; i < 30; i++) {
+			//green
+			faces[i].color = [0, 1.0, 0, 1.0];
+		}
+		for (var i = 30; i < 42; i++) {
+			//green/blue
+			faces[i].color = [0, 1.0, 1.0, 1.0];
+		}
+
+   	} else {
+		//change the colors to "off"
+		for (var i = 6; i < 30; i++) {
+			//black/dark red
+			faces[i].color = [0.6, 0.4, 0.4, 1.0];
+		}
+		for (var i = 30; i < 42; i++) {
+			//black/dark grey
+			faces[i].color = [0.5, 0.6, 0.5, 1.0];
+		}
+	}
+
+	if (isDancing) {
+		//raise arms
+		if(armsDegreesX > -90) {
+			//lower half of the arc
+			armsDegreesX -= 10
+			armsOffsetY += 8;
+			armsOffsetZ +=8;
+		} else if (armsDegreesX > -180) {
+			//upper half of the arc
+			armsDegreesX -= 10
+			armsOffsetY += 8;
+			armsOffsetZ -=8;
+		} else {
+			//arms raised = true, wave em
+			if (wave) {
+				armsWaveDegrees += 5;
+				armsWaveOffset += 5;
+				if (armsWaveDegrees > 10) {
+					wave = !wave;
+				}
+			} else {
+				armsWaveDegrees -= 5;
+				armsWaveOffset -= 5;
+				if (armsWaveDegrees < -10) {
+					wave = !wave;
+				}
+			}
+		}
+	} else {
+		//robot freezes in place if power is cut mid-dance, otherwise statements below execute when dancing stops or it turns back on
+		if (isPowered) {
+			//reset all positions whenever dancing stops as long as power is still on
+
+			//return waving arms to neutral position
+			//this was initially a smooth transition back to zero like the lowering
+			//but doing it smoothly caused some bugs with the arms getting off-centered while
+			//lowering, and the wave arc is small enough that the visual difference isn't that
+			//visually noticeable anyway
+			if (armsWaveDegrees != 0) {
+				armsWaveDegrees = 0;
+				armsWaveOffset = 0;
+			}
+
+			//lower arms only after the wave has returned to neutral position
+			if(armsDegreesX < -90 && armsWaveDegrees === 0) { //upper half of the arc
+				armsDegreesX += 10;
+				armsOffsetY -= 8;
+				armsOffsetZ +=8;
+			} else if (armsDegreesX < 0 && armsWaveDegrees === 0) { //lower half of the arc
+				armsDegreesX += 10;
+				armsOffsetY -= 8;
+				armsOffsetZ -=8;
+			}
+		}
+	}
+
+
+		//TRANSFORMATION MATRICES
+
+	// Determine transformations
+   	var Midentity = TranslateMatrix3D(0, 0, 0);
+
+	//raises arms
+	var armsRotateX = RotationXMatrix3D(armsDegreesX);
+
+	//keeps the arms on pivot
+	var armsTranslate = TranslateMatrix3D(0 + armsWaveOffset, 2.0*armsOffsetY + armsWaveOffset, 2.0*armsOffsetZ);
+
+	//wave the arms while they're raised
+	var armsRotateZ = RotationZMatrix3D(armsWaveDegrees);
+	
+   	// Transformation Matrix
+   	var Mtransform = Midentity;
+   	var McameraTransform = Midentity;
+	var armsTransform = MatrixMultiply3D(armsTranslate, MatrixMultiply3D(armsRotateX, armsRotateZ));
+
+
+   	// View-plane normal vector, N, is P0 - Pref
+   	var p0 = camera;
+   	p0 = VectorMultiply3D(McameraTransform, p0);
+   	var pref = [0.0, 0.0, 0.0, 1.0];
+
+   	var pview = [100.0, 100.0, -400.0, 1.0];
+   	var prp = [100.0, 100.0, 400.0, 1.0];
+   	var zvp = -400;
+
+   	var Mwcvc = getWorldToViewingMatrix3D(p0, pref);
+
+   	// Perspective Projection
+   	Mperspective = getPerspectiveProjectionMatrix(prp, zvp);
+	var Mproject = MatrixMultiply3D(Mperspective, Mwcvc);
+ 
+   	// Combine projection and transformation matrix
+   	var Mfinal = MatrixMultiply3D(Mproject, Mtransform);
+	var Tfinal = MatrixMultiply3D(Mproject, armsTransform);
+
+   	var projectedPoints = [];
+	//Split up loop for each separate transform needed on each face/section
+   	for (var i=0; i<originalPoints.length; i++) {
+		if ((72 <= i && i < 104)) { // Shoulders and arms
+			projectedPoints[i] = VectorMultiply3D(Tfinal, originalPoints[i]);
+		} else {
+			projectedPoints[i] = VectorMultiply3D(Mfinal, originalPoints[i]);
+		}
+     
+     		for (var j=0; j<=3; j++) {
+       			if (projectedPoints[i][3] != 0) {
+         			projectedPoints[i][j] /= projectedPoints[i][3];
+       			}
+     		}
+   	}
+
+   	// Sort faces according to depth
+   	var depth = [];
+   	var faceOrder = [];
+   	for (var i=0; i<faces.length; i++) {
+     		var pt1 = projectedPoints[faces[i].points[0]];
+     		var pt2 = projectedPoints[faces[i].points[1]];
+     		var pt3 = projectedPoints[faces[i].points[2]];
+     		var pt4 = projectedPoints[faces[i].points[3]];
+
+     		depth[i] = Math.min(pt1[2], pt2[2], pt3[2], pt4[2]);
+     		faceOrder[i] = i;
+   	}
+
+   	for (var i=faces.length-1; i>0; i--) {
+     		for (var j=0; j<i; j++) {
+       			if (depth[j] > depth[j+1]) {
+         			var t = depth[j];
+         			depth[j] = depth[j+1];
+         			depth[j+1] = t;
+         			t = faceOrder[j];
+         			faceOrder[j] = faceOrder[j+1];
+         			faceOrder[j+1] = t;
+       			}
+     		}
+   	}
+
+   	gl.clear(gl.COLOR_BUFFER_BIT);
+   	for (var i=0; i<faces.length; i++) {
+     		var x = faceOrder[i];
+     		var pt1 = projectedPoints[faces[x].points[0]];
+     		var pt2 = projectedPoints[faces[x].points[1]];
+     		var pt3 = projectedPoints[faces[x].points[2]];
+     		var pt4 = projectedPoints[faces[x].points[3]];
+
+     		// Display face (if it is visible)
+     		if (faces[x].isSolid && visibleFace(pt1, pt2, pt3, pt4)) {
+       			var vertices = [];
+       			vertices = [ 	0.001*pt1[0]/pt1[3], 0.001*pt1[1]/pt1[3],
+                    			0.001*pt2[0]/pt2[3], 0.001*pt2[1]/pt2[3],
+                    			0.001*pt3[0]/pt3[3], 0.001*pt3[1]/pt3[3],
+                    			0.001*pt4[0]/pt4[3], 0.001*pt4[1]/pt4[3] ];
+
+       			// Draw filled face
+       			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+       			gl.uniform4f(colorUniformLocation, faces[x].color[0], faces[x].color[1], faces[x].color[2], faces[x].color[3]);
+       			gl.drawArrays(gl.TRIANGLE_FAN, 0, vertices.length/2);
+
+       			// Draw outline of face
+       			var vertices = [];
+       			vertices = vertices.concat( drawLine(1.0*pt1[0]/pt1[3], 1.0*pt1[1]/pt1[3], 1.0*pt2[0]/pt2[3], 1.0*pt2[1]/pt2[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt2[0]/pt2[3], 1.0*pt2[1]/pt2[3], 1.0*pt3[0]/pt3[3], 1.0*pt3[1]/pt3[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt3[0]/pt3[3], 1.0*pt3[1]/pt3[3], 1.0*pt4[0]/pt4[3], 1.0*pt4[1]/pt4[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt4[0]/pt4[3], 1.0*pt4[1]/pt4[3], 1.0*pt1[0]/pt1[3], 1.0*pt1[1]/pt1[3], 2) );
+       			for (var z=0; z<vertices.length; z++) {
+         			vertices[z] /= 1000.0;
+       			}
+
+       			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+       			gl.uniform4f(colorUniformLocation, lineColor[0], lineColor[1], lineColor[2], lineColor[3]);
+       			gl.drawArrays(gl.POINTS, 0, vertices.length/2);
+
+     		} else if (visibleFace(pt1, pt2, pt3, pt4)) {
+			// Draw outline of face
+       			var vertices = [];
+       			vertices = vertices.concat( drawLine(1.0*pt1[0]/pt1[3], 1.0*pt1[1]/pt1[3], 1.0*pt2[0]/pt2[3], 1.0*pt2[1]/pt2[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt2[0]/pt2[3], 1.0*pt2[1]/pt2[3], 1.0*pt3[0]/pt3[3], 1.0*pt3[1]/pt3[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt3[0]/pt3[3], 1.0*pt3[1]/pt3[3], 1.0*pt4[0]/pt4[3], 1.0*pt4[1]/pt4[3], 2) );
+       			vertices = vertices.concat( drawLine(1.0*pt4[0]/pt4[3], 1.0*pt4[1]/pt4[3], 1.0*pt1[0]/pt1[3], 1.0*pt1[1]/pt1[3], 2) );
+       			for (var z=0; z<vertices.length; z++) {
+         			vertices[z] /= 1000.0;
+       			}
+
+       			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+       			gl.uniform4f(colorUniformLocation, lineColor[0], lineColor[1], lineColor[2], lineColor[3]);
+       			gl.drawArrays(gl.POINTS, 0, vertices.length/2);
+		}
+
+   	} 
+   	requestAnimFrame(render);
+}
+
+
+
+function init() {
+   	canvas = document.getElementById("gl-canvas");
+   	gl = WebGLUtils.setupWebGL(canvas);
+   	if (!gl) {
+      		alert("WebGL isn't available");
+   	}
+
+   	var program = initShaders(gl, "vertex-shader", "fragment-shader");
+
+   	var vPos = gl.getAttribLocation(program, "vPos");
+   	colorUniformLocation = gl.getUniformLocation(program, "u_color");
+   	var buffer = gl.createBuffer();
+   	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+   	gl.viewport(0, 0, canvas.width, canvas.height);
+   	gl.clearColor(0.9, 0.9, 0.9, 1.0);
+   	gl.clear(gl.COLOR_BUFFER_BIT);
+
+   	gl.useProgram(program);
+   	gl.enableVertexAttribArray(vPos);
+   	gl.vertexAttribPointer(vPos, 2, gl.FLOAT, false, 0, 0);
+
+   	render();
+}
+
+
+</script>
+
+<body>
+<canvas id="gl-canvas" width="500" height="500">
+   	Oops... your browser doesn't support HTML5's Canvas elements!
+</canvas>
+</body>
+</html>

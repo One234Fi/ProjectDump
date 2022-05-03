@@ -1,0 +1,84 @@
+<!
+Ethan McCarthy
+COSC 4345.001
+2/8/2022
+Description: Utilizes WebGL's primitives to draw a simple bar graph and a line with an arrow showing the trend of the graph.
+>
+<!DOCTYPE html>
+<html>
+<style type="text/css">
+  canvas { background: red; }
+</style>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPos;
+
+void main() {
+	gl_Position = vPos;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec4 u_color;
+
+void main() {
+	gl_FragColor = u_color;
+}
+</script>
+
+
+<script type="text/javascript" src="webgl-utils.js"></script>
+<script type="text/javascript" src="initshaders.js"></script>
+<script type="text/javascript" src="projectVertices.js"></script>
+
+<script type="text/javascript">
+var canvas;
+var gl;
+
+window.onload = init;
+
+function init() {
+ 	 canvas = document.getElementById("gl-canvas");
+ 	 gl = WebGLUtils.setupWebGL(canvas);
+  	 if (!gl) {
+  	 	alert("WebGL isn't available");
+  	 }
+
+   	var program = initShaders(gl, "vertex-shader", "fragment-shader");
+
+  	var vPos = gl.getAttribLocation(program, "vPos");
+  	var colorUniformLocation = gl.getUniformLocation(program, "u_color");
+  	var buffer = gl.createBuffer();
+   	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+   	vertices = graphPoints();
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+	gl.viewport(0, 0, canvas.width, canvas.height);
+  	gl.clearColor(0.25, 0.25, 0.25, 1.0);
+  	gl.clear(gl.COLOR_BUFFER_BIT);
+
+  	gl.useProgram(program);
+  	gl.enableVertexAttribArray(vPos);
+  	gl.vertexAttribPointer(vPos, 2, gl.FLOAT, false, 0, 0);
+
+	gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+	for (var i = 0; i < 5; i++) {
+		gl.drawArrays(gl.TRIANGLE_FAN, i*4, 4);
+	}
+	
+	gl.uniform4f(colorUniformLocation, 0, 0, 1, 1);
+	gl.drawArrays(gl.LINE_STRIP, 20, 5);
+	gl.drawArrays(gl.TRIANGLES, 25, 3);
+}
+</script>
+
+<body>
+<canvas id="gl-canvas" width="512" height="512">
+	Oops... your browser doesn't support HTML5's Canvas elements!
+</canvas>
+</body>
+</html>
+	

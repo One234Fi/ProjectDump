@@ -1,0 +1,263 @@
+<!--
+Ethan McCarthy
+COSC4345.001
+3/25/2022
+Creates 5 animated shapes
+NOTE: Hold down the mouse button to change which shapes move and the direction of the circle's movement
+-->
+
+<!DOCTYPE html>
+<html>
+<style type="text/css">
+  canvas { background: red; }
+</style>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPos;
+
+void main()
+{
+  gl_PointSize = 1.0;
+  gl_Position = vPos;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec4 u_color;
+
+void main() {
+   gl_FragColor = u_color;
+}
+</script>
+
+
+<script type="text/javascript" src="webgl-utils.js"></script>
+<script type="text/javascript" src="initshaders.js"></script>
+<script type="text/javascript" src="matrices.js"></script>
+<script type="text/javascript" src="circles.js"></script>
+
+<script type="text/javascript">
+var canvas;
+var gl;
+var colorUniformLocation;
+
+var p1 = [400.0, 0.0, 1.0]; 
+var p2 = [200.0, 0.0, 1.0];
+var p3 = [200.0, 100.0, 1.0]; 
+var p4 = [400.0, 100.0, 1.0];
+var p5 = [1.0, 350.0, 1.0];
+var p6 = [200.0, 300.0, 1.0];
+var p7 = [100.0, 50.0, 1.0];
+var p8 = [700.0, -40, 1.0]; 
+var p9 = [800.0, 90, 1.0];
+var p10 = [750.0, 100.0, 1.0]; 
+var p11 = [-400.0, 350.0, 1.0];
+var p12 = [-400, 50.0, 1.0];
+var p13 = [100.0, 350.0, 1.0];
+var p14 = [100.0, 50.0, 1.0];
+
+var circ = [0, 0, 1];
+var circlePoints = drawCircle(circ[0], circ[1], 30, 2);
+
+var identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+var m = identity;                           // transformation matrix
+var m2 = identity;
+var m3 = identity;
+var m4 = identity;
+var m5 = identity;
+
+var degrees = -5;                            // rotate -5degrees
+var degrees2 = 10;				//rotate 10 degrees
+var degrees3 = -10;				//rotate -10 degrees
+var degrees4 = 5;				//rotate 5 degrees
+var radians = degrees * (Math.PI / 180.0);  // convert degrees to radians
+var radians2 = degrees2 * (Math.PI / 180.0);
+var radians3 = degrees3 * (Math.PI / 180.0);
+var radians4 = degrees4 * (Math.PI / 180.0);
+
+var scaleFactor = 1.05;			//scale by a factor of 1.05
+var offset = 0.4;                         // translate -10 units
+var rpx = 0.0;                            // x-coordinate of rotation point
+var rpy = 0.0;                           // y-coordinate of rotation point
+                                            // rotation point is (0, 0);
+var rpx2 = 200;
+var rpy2 = 200; //rotation point is (2, 2)
+
+var rpx3 = -300;
+var rpy3 = 300; //rotation point is (-3, 3)
+
+var rpx4 = 600;
+var rpy4 = 150; // rotation point is (6, 1.5)
+
+var r = [[Math.cos(radians), -1.0*Math.sin(radians), 0.0], [Math.sin(radians), Math.cos(radians), 0.0], [0.0, 0.0, 1.0]];
+var r2 = [[Math.cos(radians2), -1.0*Math.sin(radians2), 0.0], [Math.sin(radians2), Math.cos(radians2), 0.0], [0.0, 0.0, 1.0]];
+var r3 = [[Math.cos(radians3), -1.0*Math.sin(radians3), 0.0], [Math.sin(radians3), Math.cos(radians3), 0.0], [0.0, 0.0, 1.0]];
+var r4 = [[Math.cos(radians3), -1.0*Math.sin(radians3), 0.0], [Math.sin(radians3), Math.cos(radians3), 0.0], [0.0, 0.0, 1.0]];
+
+
+var t = [[1, 0, offset], [0, 1, 0], [0, 0, 1]];
+var t1 = [ [1, 0, rpx], [0, 1, rpy], [0, 0, 1] ];
+var t2 = [ [1, 0, -1.0*rpx], [0, 1, -1.0*rpy], [0, 0, 1] ];
+
+var t3 = [ [1, 0, rpx2], [0, 1, rpy2], [0, 0, 1] ];
+var t4 = [ [1, 0, -1.0*rpx2], [0, 1, -1.0*rpy2], [0, 0, 1] ];
+
+var t5 = [ [1, 0, rpx3], [0, 1, rpy3], [0, 0, 1] ];
+var t6 = [ [1, 0, -1.0*rpx3], [0, 1, -1.0*rpy3], [0, 0, 1] ];
+
+var t7 = [ [1, 0, rpx4], [0, 1, rpy4], [0, 0, 1] ];
+var t8 = [ [1, 0, -1.0*rpx4], [0, 1, -1.0*rpy4], [0, 0, 1] ];
+
+var t9 = [[1, 0, offset], [0, 1, offset], [0, 0, 1]];
+var t10 = [[1, 0, -offset], [0, 1, -offset], [0, 0, 1]];
+
+var t11 = [[scaleFactor, 0, 0], [0, scaleFactor, 0], [0, 0, 1]];
+var t12 = [[1.0/scaleFactor, 0, 0], [0, 1.0/scaleFactor, 0], [0, 0, 1]];
+
+
+var c = MatrixMultiply3D( t1, MatrixMultiply3D(r, t2));  // Build composite matrix for rotating about (rpx, rpy)
+var d = MatrixMultiply3D( t3, MatrixMultiply3D(r2, t4)); //build composite matrix for rotating about (rpx2, rpy2)
+var e = MatrixMultiply3D( t5, MatrixMultiply3D(r3, t6));  // Build composite matrix for rotating about (rpx3, rpy3)
+var f = MatrixMultiply3D( t7, MatrixMultiply3D(r4, t8)); //build composite matrix for rotating about (rpx4, rpy4)
+var g = MatrixMultiply3D( t1, MatrixMultiply3D(t11, t2));//composite matrix for scaling up 
+var h = MatrixMultiply3D( t1, MatrixMultiply3D(t12, t2));//composite matrix for scaling down
+
+window.onload = init;
+
+function render() {
+   	var mouseDown = function(event) {
+      		m = g;
+		m2 = d;
+		m3 = identity;
+		m4 = identity;
+		m5 = t9;
+   	};
+   	canvas.addEventListener("mousedown", mouseDown, false);
+	var counter = 0;
+   	var mouseUp = function(event) {
+		m = h;
+		m2 = identity;
+		m3 = e;
+		m4 = f;
+		m5 = t10;
+   	};
+   	canvas.addEventListener("mouseup", mouseUp, false);
+
+   	var vertices = [];
+
+	//data for rectangle 1
+   	p1 = VectorMultiply3D(m, p1);
+   	vertices.push(p1[0]/1000.0);
+   	vertices.push(p1[1]/1000.0);
+
+   	p2 = VectorMultiply3D(m, p2);
+   	vertices.push(p2[0]/1000.0);
+   	vertices.push(p2[1]/1000.0);
+
+   	p3 = VectorMultiply3D(m, p3);
+   	vertices.push(p3[0]/1000.0);
+  	vertices.push(p3[1]/1000.0);
+
+   	p4 = VectorMultiply3D(m, p4);
+   	vertices.push(p4[0]/1000.0);
+   	vertices.push(p4[1]/1000.0);
+
+	//data for triangle 1
+	p5 = VectorMultiply3D(m2, p5);
+	vertices.push(p5[0]/1000.0);
+	vertices.push(p5[1]/1000.0);
+
+	p6 = VectorMultiply3D(m2, p6);
+	vertices.push(p6[0]/1000.0);
+	vertices.push(p6[1]/1000.0);
+
+	p7 = VectorMultiply3D(m2, p7);
+	vertices.push(p7[0]/1000.0);
+	vertices.push(p7[1]/1000.0);
+
+	//data for triangle2
+   	p8 = VectorMultiply3D(m3, p8);
+   	vertices.push(p8[0]/1000.0);
+   	vertices.push(p8[1]/1000.0);
+
+   	p9 = VectorMultiply3D(m3, p9);
+   	vertices.push(p9[0]/1000.0);
+   	vertices.push(p9[1]/1000.0);
+
+   	p10 = VectorMultiply3D(m3, p10);
+   	vertices.push(p10[0]/1000.0);
+  	vertices.push(p10[1]/1000.0);
+
+	//data for notched rectangel
+   	p11 = VectorMultiply3D(m4, p11);
+   	vertices.push(p11[0]/1000.0);
+   	vertices.push(p11[1]/1000.0);
+
+	p12 = VectorMultiply3D(m4, p12);
+	vertices.push(p12[0]/1000.0);
+	vertices.push(p12[1]/1000.0);
+
+	p13 = VectorMultiply3D(m4, p13);
+	vertices.push(p13[0]/1000.0);
+	vertices.push(p13[1]/1000.0);
+
+	p14 = VectorMultiply3D(m4, p14);
+	vertices.push(p14[0]/1000.0);
+	vertices.push(p14[1]/1000.0);
+
+	//data for circle
+	circ = VectorMultiply3D(m5, circ);
+	circlePoints = drawCircle(circ[0], circ[1], 30, 2);
+	
+	
+	for (var i = 0; i < circlePoints.length; i++) {
+		vertices.push(circlePoints[i]);
+	}
+
+   	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+   	gl.clear(gl.COLOR_BUFFER_BIT);
+   	gl.uniform4f(colorUniformLocation, 0.0, 1.0, 0.0, 1.0);
+   	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+	gl.drawArrays(gl.TRIANGLE_FAN, 4, 3);
+	gl.drawArrays(gl.TRIANGLE_FAN, 7, 3);
+	gl.drawArrays(gl.TRIANGLE_FAN, 10, 4);
+	gl.drawArrays(gl.POINTS, 14, vertices.length - 14);
+
+   	requestAnimFrame(render);
+}
+
+
+
+function init() {
+   	canvas = document.getElementById("gl-canvas");
+   	gl = WebGLUtils.setupWebGL(canvas);
+   	if (!gl) {
+      		alert("WebGL isn't available");
+   	}
+
+   	var program = initShaders(gl, "vertex-shader", "fragment-shader");
+
+   	var vPos = gl.getAttribLocation(program, "vPos");
+   	colorUniformLocation = gl.getUniformLocation(program, "u_color");
+   	var buffer = gl.createBuffer();
+   	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+   	gl.viewport(0, 0, canvas.width, canvas.height);
+   	gl.clearColor(0.9, 0.9, 0.9, 1.0);
+   	gl.clear(gl.COLOR_BUFFER_BIT);
+
+   	gl.useProgram(program);
+   	gl.enableVertexAttribArray(vPos);
+   	gl.vertexAttribPointer(vPos, 2, gl.FLOAT, false, 0, 0);
+
+   	render();
+}
+</script>
+
+<body>
+<canvas id="gl-canvas" width="500" height="500">
+   Oops... your browser doesn't support HTML5's Canvas elements!
+</canvas>
+</body>
+</html>
